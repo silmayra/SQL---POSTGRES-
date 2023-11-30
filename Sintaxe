@@ -1,0 +1,64 @@
+
+---------------------- 1 - CONSULTA COM EXISTS ---------------------
+
+-- Selecionar Livros que são somente Livros Físicos
+SELECT * FROM Livros LI
+WHERE EXISTS (
+    SELECT * FROM LivroFisico LF
+    WHERE LF.id_livro = LI.id_livro
+);
+
+
+----------------------- 2 - CONSULTA COM HAVING -------------------
+
+-- Faz a contagem da quantidade de Livros por Editora
+SELECT ED.id_editora, ED.nome_editora, COUNT(LI.id_livro) AS quantidade_livros
+FROM Editora ED
+LEFT JOIN Livros LI ON ED.id_editora = LI.id_editora
+GROUP BY ED.id_editora, ED.nome_editora
+HAVING COUNT(LI.id_livro) > 0;
+
+
+-------------------------- 3 - FUNÇÃO -----------------------------
+
+--- Insere na tabela de Livros e LivroFisico
+
+CREATE OR REPLACE FUNCTION inserir_livrofisico(
+	nome_livro_var varchar(50),
+	id_editora_var int,
+	valor_var numeric(10,2),
+    isbn_var bigint,
+    edicao_var varchar(30)
+) RETURNS void AS $$
+DECLARE
+    id_livro_var int;
+BEGIN
+    INSERT INTO Livros(nome_livro, id_editora, valor) VALUES (nome_livro_var, id_editora_var, valor_var)
+    RETURNING id_livro INTO id_livro_var;
+
+    INSERT INTO LivroFisico (id_livro, isbn, edicao)
+    VALUES (id_livro_var, isbn_var, edicao_var);
+	
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+---------------------------- 4 - TRIGGER -----------------------------
+
+
+---- Valida valor do Livro ao inserir ou atualizar
+CREATE OR REPLACE FUNCTION fct_livros_valor_zero()
+    RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.valor = 0 THEN
+        RAISE EXCEPTION 'O VALOR DO LIVRO NÃO PODERÁ SER IGUAL A 0';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_livros_valor_zero
+    BEFORE INSERT OR UPDATE ON Livros
+    FOR EACH ROW
+    EXECUTE FUNCTION fct_livros_valor_zero();
